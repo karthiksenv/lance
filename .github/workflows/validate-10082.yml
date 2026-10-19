@@ -1,0 +1,59 @@
+name: Validate blob descriptor subfields
+on:
+  push:
+    branches: [codex/validate-blob-descriptor-subfields]
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: 2
+  CARGO_TERM_COLOR: never
+  MATURIN_PEP517_ARGS: --profile ci
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: taiki-e/install-action@66068bfca13dcb2ea07c3f613ca2836a37c755d5
+        with:
+          tool: protoc
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked --profile ci -p lance-core
+      - run: cargo clippy --locked --profile ci --all --tests --benches -- -D warnings
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - uses: taiki-e/install-action@66068bfca13dcb2ea07c3f613ca2836a37c755d5
+        with:
+          tool: protoc
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
+        with:
+          workspaces: python
+      - name: Configure the existing ci profile for this test environment
+        run: sed -i '/^\[tool.maturin\]$/a profile = "ci"\neditable-profile = "ci"' pyproject.toml
+      - name: Set up the prescribed development environment
+        run: make install PYTHON=3.13
+      - name: Rebuild the Rust extension
+        run: uv run make build
+      - name: Run descriptor regressions
+        run: uv run pytest python/tests/test_blob.py::test_blob_v2_descriptor_subfield_queries -q
+      - name: Run the blob suite
+        run: uv run pytest python/tests/test_blob.py -q
+      - name: Run required Python lint
+        run: uv run make lint
+      - name: Match the reported PyArrow version
+        run: uv pip install --python .venv/bin/python pyarrow==26.0.0
+      - name: Run descriptor regressions on PyArrow 26
+        run: uv run --no-sync pytest python/tests/test_blob.py::test_blob_v2_descriptor_subfield_queries -q
+      - name: Run the exact reported example
+        run: uv run --no-sync python ../ci/reproduce_10082.py
