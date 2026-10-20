@@ -20,7 +20,7 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
       - run: cargo fmt --all -- --check
       - run: cargo test --locked --profile ci -p lance-core
-      - run: cargo test --locked --profile ci -p lance-encoding encodings::logical::primitive::field::tests
+      - run: cargo test --locked --profile ci -p lance-encoding
       - run: cargo test --locked --profile ci -p lance --lib dataset::tests::dataset_blob
       - run: cargo clippy --locked --profile ci --all --tests --benches -- -D warnings
   python:
